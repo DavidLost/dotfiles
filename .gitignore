@@ -1,0 +1,2 @@
+# Exclude the oh-my-zsh config, since this is a git repository itself, containing no important configuration
+.config/oh-my-zsh
