@@ -9,3 +9,23 @@
 
 # Exclude the oh-my-zsh config, since this is a git repository itself, containing no important configuration
 .config/oh-my-zsh
+
+# Editor and OS noise
+**/.DS_Store
+**/*.swp
+**/*.swo
+**/*~
+
+# Neovim runtime/cache artifacts (config belongs in .config/nvim)
+.config/nvim/.nvimlog
+.config/nvim/lua_ls.log
+.config/nvim/plugin/packer_compiled.lua
+
+# General local caches and env files that should stay local
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.cache/
+**/.env
+**/.env.*
