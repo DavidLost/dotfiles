@@ -60,3 +60,5 @@ ZSH_HIGHLIGHT_STYLES[alias]='fg=blue'
 ZSH_HIGHLIGHT_STYLES[reserved-word]='fg=blue'
 
 # figlet "Lets go zsh" | lolcat
+
+export PATH=$PATH:/home/david/.spicetify
