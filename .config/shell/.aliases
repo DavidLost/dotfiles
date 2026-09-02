@@ -42,10 +42,8 @@ alias vencord-install='sh -c "$(curl -sS https://raw.githubusercontent.com/Vendi
 # Network & VPN
 alias vpnhomenetwork='sudo wg-quick up homenetwork'
 
-# Arch / CachyOS package management
+# Common use - Arch specific
 alias pacman='sudo pacman'
-alias yay='yay'
-alias paru='paru'
 alias rmpaclock="sudo rm /var/lib/pacman/db.lck"
 alias rmpkg="sudo pacman -Rdd"
 alias gitpkg='pacman -Qq | grep -c "\-git$"'
@@ -53,7 +51,7 @@ alias cleanup='sudo pacman -Rns $(pacman -Qtdq)'
 alias big="expac -H M '%m\t%n' | sort -h | nl"
 alias rip="expac --timefmt='%Y-%m-%d %T' '%l\t%n %v' | sort | tail -200 | nl"
 
-# Java Version Management
+# Java shortcuts - Arch specific
 alias java-g='archlinux-java get'
 alias java-s='archlinux-java status'
 alias java-set8='sudo archlinux-java set java-8-openjdk'
@@ -61,7 +59,7 @@ alias java-set11='sudo archlinux-java set java-11-openjdk'
 alias java-set17='sudo archlinux-java set java-17-openjdk'
 alias java-set21='sudo archlinux-java set java-21-openjdk'
 
-# Desktop Environment (KDE Plasma)
+# Common use - KDE specific
 alias plasmarestart='systemctl --user restart plasma-plasmashell'
 alias fixkwin='qdbus org.kde.KWin /KWin reconfigure'
 alias mailspring='mailspring --password-store="kwallet5"'
@@ -72,7 +70,7 @@ alias integratedgpu='optimus-manager --switch integrated --no-confirm'
 alias nvidiagpu='optimus-manager --switch nvidia --no-confirm'
 alias hybridgpu='optimus-manager --switch hybrid --no-confirm'
 
-# Wireless Auditing / Aircrack
+# Hacking with airmon :)
 alias wlan-monitor='sudo airmon-ng start wlo1 && sudo airmon-ng check kill'
 alias wlan-managed='sudo airmon-ng stop wlo1mon && sudo systemctl restart NetworkManager'
 alias airodump='sudo airodump-ng wlo1mon'
