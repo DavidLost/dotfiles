@@ -8,10 +8,16 @@ set -gx LC_ALL en_US.UTF-8
 # Default ditor
 set -gx EDITOR "nvim"
 
+# Multithreaded make
+set -gx MAKEFLAGS (nproc 2>/dev/null || echo 4)
+
 # Rust cargo stuff
 # source "$HOME/.cargo/env"
 # export CARGO_INCREMENTAL=1                      # Enable cargo incremental compilation
 # export CARGO_TARGET_DIR="$HOME/.cargo/cache"    # Set the cargo target directory for incremental compilation
+
+# User-installed command-line tools
+fish_add_path $HOME/.local/bin
 
 # ROCm paths
 fish_add_path /opt/rocm/bin

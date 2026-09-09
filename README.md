@@ -1,6 +1,6 @@
 ## My dotfiles :)
 
-**Note:** These dotfiles use custom locations to keep the home directory clean. oh-my-zsh, oh-my-fish, `.zshrc`, and other configs are moved to `~/.config/` instead of cluttering the home directory.
+**Note:** These dotfiles use custom locations to keep the home directory clean. oh-my-zsh, `.zshrc`, and other configs are moved to `~/.config/` instead of cluttering the home directory.
 
 ### Prerequisites
 - stow
