@@ -11,7 +11,7 @@ set -gx __GLX_VENDOR_LIBRARY_NAME nvidia
 set -gx __VK_LAYER_NV_optimus NVIDIA_only
 
 # Multithreaded make
-set -gx MAKEFLAGS (nproc 2>/dev/null || echo 4)
+set -gx MAKEFLAGS "-j$(nproc 2>/dev/null || echo 4)"
 
 # Rust cargo stuff
 # source "$HOME/.cargo/env"
@@ -32,8 +32,8 @@ set -gx LD_LIBRARY_PATH /opt/rocm/lib
 set -gx STEAM_FORCE_DESKTOPUI_SCALING 1.25
 
 # Ensure multithreaded builds for cmake and ninja
-set -gx CMAKE_BUILD_PARALLEL_LEVEL (nproc 2>/dev/null || echo 4)
-set -gx NINJAJOBS (nproc 2>/dev/null || echo 4)
+set -gx CMAKE_BUILD_PARALLEL_LEVEL $(nproc 2>/dev/null || echo 4)
+set -gx NINJAJOBS $(nproc 2>/dev/null || echo 4)
 
 # NVM Config
 # Hand-written: the converter cannot translate the bash parameter expansion

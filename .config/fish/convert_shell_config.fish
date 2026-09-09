@@ -40,8 +40,14 @@ if test -f $SHELL_DIR/.env_vars
                     # Check if value contains command substitution
                     if string match -qr '\$\(' $var_value
                         # Handle command substitutions
-                        if string match -q '*nproc*' $var_value
-                            echo "set -gx $var_name (nproc 2>/dev/null || echo 4)" >> $FISH_CONF_DIR/env_vars.fish
+                        if string match -q '*$(nproc)*' $var_value
+                            # Substitute in place so surrounding text survives,
+                            # e.g. -j$(nproc) must stay -j16 and not become 16.
+                            # Keep the $ prefix: fish only treats (cmd) as a
+                            # substitution when unquoted, but $(cmd) works both
+                            # inside and outside the double quotes kept above.
+                            set fish_value (string replace -a '$(nproc)' '$(nproc 2>/dev/null || echo 4)' $var_value)
+                            echo "set -gx $var_name $fish_value" >> $FISH_CONF_DIR/env_vars.fish
                         else
                             echo "set -gx $var_name $var_value" >> $FISH_CONF_DIR/env_vars.fish
                         end
