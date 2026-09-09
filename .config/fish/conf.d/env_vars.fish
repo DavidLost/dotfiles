@@ -1,5 +1,5 @@
-# Auto-generated from ~/.config/shell/.env_vars
-# Run ~/.config/fish/convert_shell_config.fish to regenerate
+# Auto-generated from ~/.config/shell/.env_vars - do not edit.
+# Run ~/.config/fish/convert_shell_config.fish to regenerate.
 
 # Set language vars to english
 set -gx LANG en_US.UTF-8
@@ -11,7 +11,7 @@ set -gx __GLX_VENDOR_LIBRARY_NAME nvidia
 set -gx __VK_LAYER_NV_optimus NVIDIA_only
 
 # Multithreaded make
-set -gx MAKEFLAGS "-j$(nproc 2>/dev/null || echo 4)"
+set -gx MAKEFLAGS "-j$(nproc)"
 
 # Rust cargo stuff
 # source "$HOME/.cargo/env"
@@ -22,25 +22,21 @@ set -gx MAKEFLAGS "-j$(nproc 2>/dev/null || echo 4)"
 set -gx EDITOR "nvim"
 
 # User-installed command-line tools
-fish_add_path $HOME/.local/bin
+fish_add_path "$HOME/.local/bin"
 
 # ROCm paths
-fish_add_path /opt/rocm/bin
+fish_add_path "/opt/rocm/bin"
 set -gx LD_LIBRARY_PATH /opt/rocm/lib
 
 # Launch steam always with 1.25 scaling (doesn't seem to work...)
 set -gx STEAM_FORCE_DESKTOPUI_SCALING 1.25
 
 # Ensure multithreaded builds for cmake and ninja
-set -gx CMAKE_BUILD_PARALLEL_LEVEL $(nproc 2>/dev/null || echo 4)
-set -gx NINJAJOBS $(nproc 2>/dev/null || echo 4)
+set -gx CMAKE_BUILD_PARALLEL_LEVEL $(nproc)
+set -gx NINJAJOBS $(nproc)
 
 # NVM Config
-# Hand-written: the converter cannot translate the bash parameter expansion
-# below, and nvm.sh is a bash function that fish cannot source at all. Only
-# NVM_DIR is exported; use nvm.fish or bass to drive nvm from fish.
-if test -n "$XDG_CONFIG_HOME"
-    set -gx NVM_DIR "$XDG_CONFIG_HOME/nvm"
-else
-    set -gx NVM_DIR "$HOME/.nvm"
-end
+# Not translated (fish cannot parse this value):
+#   export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+# Not translated (not an export):
+#   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm

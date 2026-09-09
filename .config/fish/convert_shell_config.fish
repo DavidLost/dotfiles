@@ -1,113 +1,202 @@
 #!/usr/bin/env fish
-# Script to convert bash shell config to fish syntax
-# Run this script whenever you update .env_vars or .aliases
+# Convert the shell-agnostic config in ~/.config/shell into fish syntax.
+# Run this whenever you edit .env_vars or .aliases.
+#
+# Every definition is checked before it is written, so the generated files
+# always source cleanly. Anything fish cannot parse is written out commented,
+# with the reason, and reported at the end.
+#
+# The generated files are overwritten on every run - never hand-edit them.
+# Fish code that has no counterpart in the shared config (see conf.d/nvm.fish)
+# belongs in its own conf.d file instead.
 
-set SHELL_DIR ~/.config/shell
-set FISH_CONF_DIR ~/.config/fish/conf.d
+set -g SHELL_DIR ~/.config/shell
+set -g FISH_CONF_DIR ~/.config/fish/conf.d
+set -g skipped 0
+
+# --- helpers ---------------------------------------------------------------
+
+# Comment lines and blank lines carry over to the generated file untouched.
+function __csc_is_comment --argument-names line
+    string match -qr '^\s*(#|$)' -- $line
+end
+
+# Strip one layer of balanced surrounding quotes.
+function __csc_unquote --argument-names value
+    set -l m (string match -r '^(["\'])(.*)\1$' -- $value)
+    if test (count $m) -gt 0
+        printf '%s\n' $m[3]
+    else
+        printf '%s\n' $value
+    end
+end
+
+# Wrap a string in fish single quotes so one round of parsing reproduces it.
+function __csc_squote --argument-names value
+    set -l e (string replace -a -- '\\' '\\\\' $value)
+    set e (string replace -a -- "'" "\\'" $e)
+    printf "'%s'\n" $e
+end
+
+# Does the snippet parse as fish? -n parses without running anything.
+function __csc_parses --argument-names code
+    fish -n -c $code 2>/dev/null
+end
+
+# `alias` re-parses the body when it builds the function, which -n on the
+# alias line alone never reaches. Define it in a throwaway shell and watch
+# stderr instead - defining an alias runs nothing.
+function __csc_alias_parses --argument-names code
+    set -l err (fish --no-config -c $code 2>&1 >/dev/null)
+    test -z "$err"
+end
+
+function __csc_skip --argument-names out reason source_line
+    printf '# Not translated (%s):\n#   %s\n' $reason $source_line >>$out
+    set -g skipped (math $skipped + 1)
+    printf '  ! %s: %s\n' $reason $source_line
+end
+
+function __csc_header --argument-names out source_name
+    printf '# Auto-generated from ~/.config/shell/%s - do not edit.\n' $source_name >$out
+    printf '# Run ~/.config/fish/convert_shell_config.fish to regenerate.\n\n' >>$out
+end
+
+# --- environment variables -------------------------------------------------
+
+function __csc_convert_env
+    set -l src $SHELL_DIR/.env_vars
+    set -l out $FISH_CONF_DIR/env_vars.fish
+    test -f $src; or return
+    __csc_header $out .env_vars
+
+    while read -l line
+        if __csc_is_comment $line
+            printf '%s\n' $line >>$out
+            continue
+        end
+
+        set -l m (string match -r '^\s*export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$' -- $line)
+        if test (count $m) -eq 0
+            __csc_skip $out 'not an export' $line
+            continue
+        end
+        set -l name $m[2]
+        set -l value $m[3]
+
+        set -l code
+        if test $name = PATH
+            # export PATH=$PATH:/some/dir  ->  fish_add_path /some/dir
+            set -l dir (__csc_unquote $value)
+            set dir (string replace -r '^\$\{?PATH\}?:' '' -- $dir)
+            set dir (string replace -r ':\$\{?PATH\}?$' '' -- $dir)
+            set code "fish_add_path \"$dir\""
+        else
+            # Keep the author's quoting. fish and bash agree on what '...' and
+            # "..." mean closely enough that most values round-trip unchanged,
+            # including "$(cmd)" substitutions.
+            set code "set -gx $name $value"
+        end
+
+        if __csc_parses $code
+            printf '%s\n' $code >>$out
+        else
+            __csc_skip $out 'fish cannot parse this value' $line
+        end
+    end <$src
+
+    printf '  created %s\n' $out
+end
+
+# --- aliases ---------------------------------------------------------------
+
+# Split `'body' # comment` (or "body", or a bare word) into its two parts
+# without being fooled by a '#' inside the body. Sets csc_body and csc_comment.
+function __csc_split_alias --argument-names rest
+    set -g csc_body ''
+    set -g csc_comment ''
+    set -l m (string match -r '^(\'[^\']*\')\s*(#.*)?$' -- $rest)
+    if test (count $m) -eq 0
+        set m (string match -r '^("(?:[^"\\\\]|\\\\.)*")\s*(#.*)?$' -- $rest)
+    end
+    if test (count $m) -eq 0
+        set m (string match -r '^([^\s#]+)\s*(#.*)?$' -- $rest)
+    end
+    test (count $m) -gt 0; or return 1
+    set -g csc_body $m[2]
+    set -g csc_comment $m[3]
+end
+
+function __csc_convert_aliases
+    set -l src $SHELL_DIR/.aliases
+    set -l out $FISH_CONF_DIR/aliases.fish
+    test -f $src; or return
+    __csc_header $out .aliases
+
+    while read -l line
+        if __csc_is_comment $line
+            printf '%s\n' $line >>$out
+            continue
+        end
+
+        set -l m (string match -r '^\s*alias\s+([^=\s]+)=(.*)$' -- $line)
+        if test (count $m) -eq 0
+            __csc_skip $out 'not an alias' $line
+            continue
+        end
+        set -l name $m[2]
+
+        if not __csc_split_alias $m[3]
+            __csc_skip $out 'cannot separate body from comment' $line
+            continue
+        end
+        set -l body $csc_body
+        set -l inner (__csc_unquote $body)
+        set -l trailer ''
+        test -n "$csc_comment"; and set trailer "  $csc_comment"
+
+        # `(cmd)` is a subshell in bash but a command substitution in fish, so
+        # it would parse and then do the wrong thing. Refuse rather than guess.
+        if string match -qr '(^|[;&|]\s*)\(' -- $inner
+            __csc_skip $out 'bash subshell has no fish equivalent' $line
+            continue
+        end
+
+        set -l code
+        if string match -qr '&\s*$' -- $inner
+            # fish's alias appends $argv, which would land after the & and be
+            # run as its own command. Emit a function and place $argv itself.
+            set -l cmd (string replace -r '\s*&\s*$' '' -- $inner)
+            set code "function $name --description "(__csc_squote "alias $name=$inner")"
+    $cmd \$argv &
+end"
+            if __csc_parses $code
+                printf '%s%s\n' $code $trailer >>$out
+            else
+                __csc_skip $out 'fish cannot parse this body' $line
+            end
+        else
+            set code "alias $name=$body"
+            if __csc_alias_parses $code
+                printf '%s%s\n' $code $trailer >>$out
+            else
+                __csc_skip $out 'fish cannot parse this body' $line
+            end
+        end
+    end <$src
+
+    printf '  created %s\n' $out
+end
+
+# --- run -------------------------------------------------------------------
 
 echo "Converting shell configuration to fish syntax..."
-
-# Convert environment variables
-if test -f $SHELL_DIR/.env_vars
-    echo "# Auto-generated from ~/.config/shell/.env_vars" > $FISH_CONF_DIR/env_vars.fish
-    echo "# Run ~/.config/fish/convert_shell_config.fish to regenerate" >> $FISH_CONF_DIR/env_vars.fish
-    echo "" >> $FISH_CONF_DIR/env_vars.fish
-    
-    # Parse each line
-    for line in (cat $SHELL_DIR/.env_vars)
-        # Skip comments and empty lines
-        if string match -qr '^\s*#' $line; or test -z "$line"
-            echo $line >> $FISH_CONF_DIR/env_vars.fish
-            continue
-        end
-        
-        # Convert export statements
-        if string match -qr '^export ' $line
-            set cleaned (string replace 'export ' '' $line)
-            set var_name (string split -m 1 '=' $cleaned)[1]
-            set var_value (string split -m 1 '=' $cleaned)[2]
-            
-            # Remove quotes
-            set var_value (string trim -c '"' -c "'" $var_value)
-            
-            # Handle special cases
-            switch $var_name
-                case 'PATH'
-                    # Extract the actual path from $PATH:/some/path constructs
-                    set path_to_add (string replace '$PATH:' '' $var_value)
-                    echo "fish_add_path $path_to_add" >> $FISH_CONF_DIR/env_vars.fish
-                case '*'
-                    # Check if value contains command substitution
-                    if string match -qr '\$\(' $var_value
-                        # Handle command substitutions
-                        if string match -q '*$(nproc)*' $var_value
-                            # Substitute in place so surrounding text survives,
-                            # e.g. -j$(nproc) must stay -j16 and not become 16.
-                            # Keep the $ prefix: fish only treats (cmd) as a
-                            # substitution when unquoted, but $(cmd) works both
-                            # inside and outside the double quotes kept above.
-                            set fish_value (string replace -a '$(nproc)' '$(nproc 2>/dev/null || echo 4)' $var_value)
-                            echo "set -gx $var_name $fish_value" >> $FISH_CONF_DIR/env_vars.fish
-                        else
-                            echo "set -gx $var_name $var_value" >> $FISH_CONF_DIR/env_vars.fish
-                        end
-                    else
-                        echo "set -gx $var_name $var_value" >> $FISH_CONF_DIR/env_vars.fish
-                    end
-            end
-        else if string match -qr '^\s*$' $line
-            echo "" >> $FISH_CONF_DIR/env_vars.fish
-        else
-            # Keep other lines as comments
-            echo "# $line" >> $FISH_CONF_DIR/env_vars.fish
-        end
-    end
-    
-    echo "✓ Created $FISH_CONF_DIR/env_vars.fish"
-end
-
-# Convert aliases
-if test -f $SHELL_DIR/.aliases
-    echo "# Auto-generated from ~/.config/shell/.aliases" > $FISH_CONF_DIR/aliases.fish
-    echo "# Run ~/.config/fish/convert_shell_config.fish to regenerate" >> $FISH_CONF_DIR/aliases.fish
-    echo "" >> $FISH_CONF_DIR/aliases.fish
-    
-    for line in (cat $SHELL_DIR/.aliases)
-        # Skip comments and empty lines, but preserve section comments
-        if string match -qr '^\s*##' $line
-            echo (string replace '##' '#' $line) >> $FISH_CONF_DIR/aliases.fish
-            continue
-        else if string match -qr '^\s*#' $line
-            continue
-        else if test -z "$line"
-            echo "" >> $FISH_CONF_DIR/aliases.fish
-            continue
-        end
-        
-        # Convert alias statements
-        if string match -qr '^alias ' $line
-            # Remove inline comments first
-            set clean_line (string split '#' $line)[1]
-            set cleaned (string replace 'alias ' '' $clean_line)
-            set alias_name (string split -m 1 '=' $cleaned)[1]
-            set alias_value (string split -m 1 '=' $cleaned)[2]
-            
-            # Trim whitespace and leading/trailing quotes as needed
-            set alias_value (string trim $alias_value)
-            
-            # Skip problematic aliases with complex bash syntax (subshells with background jobs)
-            if string match -qr '\(.*\).*&' $alias_value
-                echo "# Skipped complex alias: $alias_name" >> $FISH_CONF_DIR/aliases.fish
-                continue
-            end
-            
-            # Write the alias exactly as it is (fish handles both single and double quotes)
-            echo "alias $alias_name=$alias_value" >> $FISH_CONF_DIR/aliases.fish
-        end
-    end
-    
-    echo "✓ Created $FISH_CONF_DIR/aliases.fish"
-end
+__csc_convert_env
+__csc_convert_aliases
 
 echo ""
-echo "Conversion complete! Reload fish config with: source ~/.config/fish/config.fish"
+if test $skipped -gt 0
+    echo "Done, but $skipped line(s) could not be translated - see the comments above."
+else
+    echo "Done. Reload with: exec fish"
+end
